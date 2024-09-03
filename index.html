@@ -95,6 +95,9 @@
             color: #ff0000;
         }
     </style>
+    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-database.js"></script>
 </head>
 <body>
     <div class="menu-icon" onclick="toggleMenu()">&#9776;</div>
@@ -136,6 +139,22 @@
     </div>
 
     <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAv2zIva6zjWX4ZvcN-SP9FoDLymdT8T2k",
+            authDomain: "solarsmart-ev.firebaseapp.com",
+            databaseURL: "https://solarsmart-ev-default-rtdb.firebaseio.com",
+            projectId: "solarsmart-ev",
+            storageBucket: "solarsmart-ev.appspot.com",
+            messagingSenderId: "500955251182",
+            appId: "1:500955251182:web:1161f2a06e128c27f14eff",
+            measurementId: "G-798Y2GPDSN"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         function toggleMenu() {
             var sideMenu = document.getElementById("sideMenu");
             if (sideMenu.style.right === "0px") {
@@ -181,16 +200,15 @@
                 return;
             }
 
-            var xhr = new XMLHttpRequest();
-            var url = "http://192.168.4.1/charge";
-            xhr.open("GET", url + "?percent=" + desiredCharge, true);
-            xhr.send();
-
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    alert("Charge request sent successfully!");
-                }
-            };
+            // Send the charge request to Firebase
+            firebase.database().ref('chargeRequest').set({
+                desiredCharge: desiredCharge,
+                timeRequired: document.getElementById("timeRequired").value
+            }).then(function() {
+                alert("Charge request sent successfully!");
+            }).catch(function(error) {
+                alert("Error sending charge request: " + error.message);
+            });
         }
 
         function findNetwork() {
