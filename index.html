@@ -6,7 +6,7 @@
     <title>EV Charging Station</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             background-color: #f0f0f0;
             margin: 0;
             padding: 0;
@@ -24,13 +24,12 @@
             color: #333;
             margin-bottom: 20px;
         }
-        input[type="number"], input[type="text"] {
+        input[type="number"], input[type="text"], input[type="password"] {
             width: 100%;
             padding: 12px;
             margin-bottom: 20px;
             border: 1px solid #ccc;
             border-radius: 5px;
-            box-sizing: border-box;
             font-size: 16px;
         }
         button {
@@ -51,9 +50,9 @@
             position: absolute;
             top: 15px;
             right: 15px;
-            cursor: pointer;
             font-size: 30px;
             color: #333;
+            cursor: pointer;
         }
         .side-menu {
             height: 100%;
@@ -69,10 +68,10 @@
         }
         .side-menu a {
             padding: 10px 15px;
-            text-decoration: none;
             font-size: 18px;
-            color: #fff;
+            color: white;
             display: block;
+            text-decoration: none;
             transition: 0.3s;
         }
         .side-menu a:hover {
@@ -92,31 +91,32 @@
         }
         .status-message {
             margin-top: 10px;
-            color: #ff0000;
+            color: red;
         }
     </style>
-    <!-- Import Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
 </head>
 <body>
+    <!-- Side Menu Trigger -->
     <div class="menu-icon" onclick="toggleMenu()">&#9776;</div>
 
+    <!-- Side Menu -->
     <div class="side-menu" id="sideMenu">
         <a href="javascript:void(0)" class="close-btn" onclick="toggleMenu()">&times;</a>
         <a href="#" onclick="showContent('chargeSection')">EV Charging</a>
+        <a href="#" onclick="showContent('wifiSection')">Wi-Fi Connect</a>
         <a href="#stationDetails">Station Details</a>
         <a href="#donate">Donate to Charity</a>
     </div>
 
+    <!-- EV Charging Form -->
     <div id="chargeSection" class="container content active">
         <h1>EV Charging Station</h1>
 
         <p>Enter your current charge percentage:</p>
-        <input type="number" id="currentCharge" min="0" max="100" placeholder="Current charge %">
+        <input type="number" id="currentCharge" min="0" max="100" placeholder="Current charge %" required>
 
         <p>Enter the distance to travel (in km):</p>
-        <input type="number" id="distanceToTravel" min="1" placeholder="Distance in km">
+        <input type="number" id="distanceToTravel" min="1" placeholder="Distance in km" required>
 
         <p>Calculated desired charge percentage:</p>
         <input type="number" id="desiredCharge" min="1" max="100" placeholder="Desired charge %" readonly>
@@ -126,80 +126,134 @@
 
         <button onclick="calculateCharge()">Calculate</button>
         <button onclick="sendChargeRequest()">Submit</button>
+        <div class="status-message" id="statusMessage"></div>
     </div>
 
-    <script>
-        // Your web app's Firebase configuration
+    <!-- Wi-Fi Connection Form -->
+    <div id="wifiSection" class="container content">
+        <h1>Wi-Fi Connect</h1>
+        <input type="text" id="ssid" placeholder="Enter SSID" required>
+        <input type="password" id="password" placeholder="Enter Password" required>
+        <button id="findNetworkBtn" onclick="findNetwork()">Find Network</button>
+        <button id="connectBtn" onclick="connectToWiFi()" style="display:none;">Connect to ESP8266</button>
+        <div class="status-message" id="wifiStatusMessage"></div>
+    </div>
+
+    <!-- Firebase and JavaScript Functions -->
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "firebase/app";
+        import { getDatabase, ref, set } from "firebase/database";
+        import { getAnalytics } from "firebase/analytics";
+
+        // Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyAv2zIva6zjWX4ZvcN-SP9FoDLymdT8T2k",
-            authDomain: "solarsmart-ev.firebaseapp.com",
-            databaseURL: "https://solarsmart-ev-default-rtdb.firebaseio.com",
-            projectId: "solarsmart-ev",
-            storageBucket: "solarsmart-ev.appspot.com",
-            messagingSenderId: "500955251182",
-            appId: "1:500955251182:web:1161f2a06e128c27f14eff",
-            measurementId: "G-798Y2GPDSN"
+            apiKey: "AIzaSyBuwoihGoRMN4oDHvzFLWABkOSKynHZsBg",
+            authDomain: "solarsmart-e68f8.firebaseapp.com",
+            projectId: "solarsmart-e68f8",
+            storageBucket: "solarsmart-e68f8.appspot.com",
+            messagingSenderId: "262623003110",
+            appId: "1:262623003110:web:97a69939b4005d57e79627",
+            measurementId: "G-T3P4PS3RJ2"
         };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const analytics = getAnalytics(app);
 
-        function toggleMenu() {
-            var sideMenu = document.getElementById("sideMenu");
-            if (sideMenu.style.right === "0px") {
-                sideMenu.style.right = "-250px";
-            } else {
-                sideMenu.style.right = "0px";
-            }
-        }
-
-        function showContent(sectionId) {
-            var sections = document.getElementsByClassName('content');
-            for (var i = 0; i < sections.length; i++) {
-                sections[i].classList.remove('active');
-            }
-            document.getElementById(sectionId).classList.add('active');
-            toggleMenu();
-        }
-
+        // Calculate the required charge based on input
         function calculateCharge() {
-            var currentCharge = parseFloat(document.getElementById("currentCharge").value);
-            var distanceToTravel = parseFloat(document.getElementById("distanceToTravel").value);
+            const currentCharge = parseFloat(document.getElementById("currentCharge").value);
+            const distanceToTravel = parseFloat(document.getElementById("distanceToTravel").value);
 
             if (isNaN(currentCharge) || isNaN(distanceToTravel) || currentCharge < 0 || currentCharge > 100) {
                 alert("Please enter valid values for current charge and distance.");
                 return;
             }
 
-            var chargeNeededForDistance = (distanceToTravel / 150) * 100;
-            var totalChargeNeeded = chargeNeededForDistance + 10;
+            const chargeNeededForDistance = (distanceToTravel / 150) * 100;
+            const totalChargeNeeded = chargeNeededForDistance + 10;  // 10% buffer
+            const desiredCharge = Math.min(currentCharge + totalChargeNeeded, 100);
 
-            var desiredCharge = Math.min(currentCharge + totalChargeNeeded, 100);
             document.getElementById("desiredCharge").value = desiredCharge.toFixed(2);
-
-            var timeRequired = (desiredCharge - currentCharge) * 1;
+            const timeRequired = (desiredCharge - currentCharge) * 1;  // Simplified calculation
             document.getElementById("timeRequired").value = timeRequired.toFixed(2);
         }
 
+        // Submit charge request to Firebase
         function sendChargeRequest() {
-            var desiredCharge = document.getElementById("desiredCharge").value;
+            const desiredCharge = document.getElementById("desiredCharge").value;
 
-            if (desiredCharge === "" || desiredCharge < 1 || desiredCharge > 100) {
+            if (!desiredCharge || desiredCharge < 1 || desiredCharge > 100) {
                 alert("Please calculate the desired charge percentage first.");
                 return;
             }
 
-            // Push data to Firebase Realtime Database
-            const chargeRequestRef = database.ref('chargeRequests').push();
-            chargeRequestRef.set({
+            const chargeRequestRef = ref(database, 'chargeRequests/' + new Date().getTime());
+            set(chargeRequestRef, {
                 desiredCharge: desiredCharge,
-                timestamp: Date.now()
+                timestamp: new Date().toISOString()
             }).then(() => {
-                alert("Charge request sent successfully!");
+                document.getElementById("statusMessage").textContent = "Charge request sent successfully!";
             }).catch((error) => {
-                alert("Error sending request: " + error.message);
+                console.error("Error sending charge request: ", error);
+                document.getElementById("statusMessage").textContent = "Failed to send charge request. Please try again.";
             });
+        }
+
+        // Wi-Fi connection simulation
+        function findNetwork() {
+            document.getElementById("wifiStatusMessage").textContent = "Searching for available networks...";
+            setTimeout(() => {
+                document.getElementById("wifiStatusMessage").textContent = "ESP8266 found! Ready to connect.";
+                document.getElementById("connectBtn").style.display = "block";
+            }, 2000); // Simulated network search delay
+        }
+
+        function connectToWiFi() {
+            const ssid = document.getElementById("ssid").value;
+            const password = document.getElementById("password").value;
+
+            if (!ssid || !password) {
+                alert("Please enter both SSID and password.");
+                return;
+            }
+
+            // Example of network connection logic
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "http://192.168.4.1/connect", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send(`ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}`);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    document.getElementById("wifiStatusMessage").textContent = "Connection successful!";
+                    setTimeout(() => showContent('chargeSection'), 2000);  // Redirect after success
+                } else if (xhr.readyState === 4) {
+                    document.getElementById("wifiStatusMessage").textContent = "Failed to connect. Try again.";
+                }
+            };
+        }
+
+        // Menu toggle logic
+        function toggleMenu() {
+            const menu = document.getElementById("sideMenu");
+            if (menu.style.right === "0px") {
+                menu.style.right = "-250px";
+            } else {
+                menu.style.right = "0px";
+            }
+        }
+
+        // Content toggle between sections
+        function showContent(sectionId) {
+            const contents = document.getElementsByClassName("content");
+            for (const content of contents) {
+                content.classList.remove("active");
+            }
+            document.getElementById(sectionId).classList.add("active");
+            toggleMenu(); // Close the side menu
         }
     </script>
 </body>
