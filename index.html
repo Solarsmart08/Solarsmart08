@@ -94,9 +94,6 @@
             margin-top: 10px;
             color: #ff0000;
         }
-        .charging-status {
-            display: none;
-        }
     </style>
     <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
     <script src="https://www.gstatic.com/firebasejs/9.8.4/firebase-app.js"></script>
@@ -139,12 +136,6 @@
         <button id="findNetworkBtn" onclick="findNetwork()">Find Network</button>
         <button id="connectBtn" onclick="connectToWiFi()" style="display:none;">Connect to ESP8266</button>
         <div class="status-message" id="statusMessage"></div>
-    </div>
-
-    <div id="chargingStatus" class="container charging-status">
-        <h1>Your Charging Has Started!</h1>
-        <p id="chargingMessage"></p>
-        <p>Time Remaining: <span id="remainingTime"></span> minutes</p>
     </div>
 
     <script>
@@ -203,7 +194,6 @@
 
         function sendChargeRequest() {
             var desiredCharge = document.getElementById("desiredCharge").value;
-            var timeRequired = document.getElementById("timeRequired").value;
 
             if (desiredCharge === "" || desiredCharge < 1 || desiredCharge > 100) {
                 alert("Please calculate the desired charge percentage first.");
@@ -213,53 +203,34 @@
             // Send the charge request to Firebase
             firebase.database().ref('chargeRequest').set({
                 desiredCharge: desiredCharge,
-                timeRequired: timeRequired
+                timeRequired: document.getElementById("timeRequired").value
             }).then(function() {
                 alert("Charge request sent successfully!");
-                showChargingStatus(timeRequired);
             }).catch(function(error) {
                 alert("Error sending charge request: " + error.message);
             });
         }
 
-        function showChargingStatus(timeRequired) {
-            // Hide other sections and show charging status
-            var sections = document.getElementsByClassName('content');
-            for (var i = 0; i < sections.length; i++) {
-                sections[i].classList.remove('active');
-            }
-
-            document.getElementById("chargingStatus").classList.add('active');
-            document.getElementById("chargingMessage").textContent = "Charging your vehicle...";
-            startTimer(timeRequired);
-        }
-
-        function startTimer(duration) {
-            var timer = duration, minutes, seconds;
-            var remainingTimeDisplay = document.getElementById("remainingTime");
-            setInterval(function () {
-                minutes = parseInt(timer / 60, 10);
-                seconds = parseInt(timer % 60, 10);
-                remainingTimeDisplay.textContent = minutes + "m " + seconds + "s";
-
-                if (--timer < 0) {
-                    timer = 0;
-                    remainingTimeDisplay.textContent = "0m 0s";
-                }
-            }, 1000);
-        }
-
         function findNetwork() {
-            // Implement logic to find available networks if needed
-            alert("Finding available networks... (not implemented)");
+            document.getElementById("statusMessage").textContent = "Searching for available networks...";
+            setTimeout(function() {
+                document.getElementById("statusMessage").textContent = "ESP8266 found! Ready to connect.";
+                document.getElementById("connectBtn").style.display = "block";
+            }, 2000); // Simulating network search delay
         }
 
         function connectToWiFi() {
             var ssid = document.getElementById("ssid").value;
             var password = document.getElementById("password").value;
 
+            if (ssid === "" || password === "") {
+                alert("Please enter both SSID and password.");
+                return;
+            }
+
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", "YOUR_ESP8266_ENDPOINT_URL", true); // Replace with your ESP8266 URL
+            var url = "http://192.168.4.1/connect"; // Make sure this is the correct URL for your ESP8266
+            xhr.open("POST", url, true);
             xhr.setRequestHeader("Content-Type", "application/json");
             xhr.onreadystatechange = function() {
                 if (xhr.readyState == 4 && xhr.status == 200) {
